@@ -61,6 +61,7 @@ async def consume_deribit_and_produce_kafka(producer, session):
 
 
     while True:
+        cnt = 0
         try:
             async with session.ws_connect(DERIBIT_WS_API) as ws:
                 # Subscribe to a Deribit channel using ws.send_json for easier JSON handling
@@ -75,9 +76,13 @@ async def consume_deribit_and_produce_kafka(producer, session):
                 async for msg in ws:
                     if msg.type == WSMsgType.TEXT:
                         data = msg.data.strip()
-                        print(f"Received data from Deribit: {data}")
+
                         # Produce the received message to Kafka
                         await produce_to_kafka(producer, KAFKA_TOPIC, data)
+                        cnt +=1
+                        if cnt%50 ==0:
+                            print(f"Received data from Deribit: {data}")
+                            cnt =0
                     elif msg.type in (WSMsgType.CLOSED, WSMsgType.ERROR):
                         break
         except (WSServerHandshakeError, ClientConnectorError) as e:
