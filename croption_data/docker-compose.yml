@@ -30,7 +30,7 @@ services:
   mongo:
     container_name: mongo
     restart: always
-    image: mongo:latest
+    image: mongo:4.4
     env_file:
       - .env # configure mongo
     volumes:
