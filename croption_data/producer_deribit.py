@@ -23,6 +23,22 @@ async def produce_to_kafka(producer, topic, message):
         print(f"Failed to send message to Kafka due to: {e}")
         # Implement retry logic here if needed
 
+
+def get_channels():
+
+    channels_call_ = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-C.agg2' for k in range(40, 56, 1)]
+    channels_put_ = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-P.agg2' for k in range(40, 56, 1)]
+    return channels_put_ + channels_call_ + ['ticker.BTC-PERPETUAL.agg2']
+#
+# {"jsonrpc":"2.0","method":"subscription",
+#  "params":{"channel":"ticker.BTC-23FEB24-45000-C.agg2",
+#            "data":
+#            {"estimated_delivery_price":48321.99,"best_bid_amount":32.3,"best_ask_amount":32.4,"bid_iv":37.0,"ask_iv":56.44,"underlying_index":"BTC-23FEB24","underlying_price":48559.14,"mark_iv":46.17,"best_bid_price":0.0775,"best_ask_price":0.0865,"interest_rate":0.0,"mark_price":0.0815,"open_interest":1716.9,"max_price":0.117,"min_price":0.0515,"settlement_price":0.06076527,"last_price":0.085,"instrument_name":"BTC-23FEB24-45000-C","index_price":48321.99,
+#            "greeks":{"rho":12.04475,"theta":-42.9504,"vega":22.55662,"gamma":0.00006,"delta":0.82809},
+#            "stats":{"volume_usd":154419.3,"volume":52.3,"price_change":36.0,"low":0.0605,"high":0.085},
+#            "state":"open","timestamp":1707627659690}}}
+
+
 async def consume_deribit_and_produce_kafka(producer, session):
     retry_delay = 5  # Seconds to wait before retrying connection
     #
@@ -53,10 +69,9 @@ async def consume_deribit_and_produce_kafka(producer, session):
                     "id": 1,
                     "method": "public/subscribe",
                     "params": {
-                        "channels": ["ticker.BTC-PERPETUAL.agg2"]
+                        "channels": get_channels()
                     }
                 })
-
                 async for msg in ws:
                     if msg.type == WSMsgType.TEXT:
                         data = msg.data.strip()
