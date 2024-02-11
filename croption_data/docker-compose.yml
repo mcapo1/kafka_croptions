@@ -31,6 +31,9 @@ services:
     container_name: mongo
     restart: always
     image: mongo:4.4
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: team
+      MONGO_INITDB_ROOT_PASSWORD: Python123
     env_file:
       - .env # configure mongo
     volumes:
