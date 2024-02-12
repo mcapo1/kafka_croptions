@@ -4,21 +4,196 @@ from kafka.errors import KafkaError
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import PyMongoError
 import json
+import sys
 
+from sqlalchemy import Column, DateTime
+from sqlalchemy import create_engine
+from sqlalchemy.sql import text
+from sqlalchemy import create_engine, Column, Float, String, BigInteger, Numeric, TIMESTAMP, Boolean
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import declarative_base
+
+from aiologger import Logger
+from aiologger.levels import LogLevel
+from aiologger.formatters.base import Formatter
+from aiologger.handlers.streams import AsyncStreamHandler
+
+from sqlalchemy.orm import sessionmaker
+import asyncio
 # MongoDB configuration
-MONGO_DETAILS = "mongodb://localhost:27018"
-DATABASE_NAME = "deribit_options"
+MONGO_DETAILS = "mongodb://team:Python123@localhost:27018/"
+DATABASE_NAME = "deribit_options_1"
 # COLLECTION_NAME = "ticker111"
 
+from datetime import datetime, timezone
 # Kafka configuration
 KAFKA_TOPIC = 'real_time_data'
 KAFKA_SERVERS = 'localhost:9093'
+
+from sqlalchemy.ext.asyncio import async_scoped_session
+
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
+import asyncio
+from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.sql import text
+
+from sqlalchemy.dialects.postgresql import BIGINT
+from sqlalchemy.schema import UniqueConstraint
+
+DATABASE_URI = f'postgresql+asyncpg://team:Python123@localhost/postgres'
+# async_engine = create_async_engine(DATABASE_URI, echo=True)
+async_engine: AsyncEngine = create_async_engine(DATABASE_URI)
+AsyncSessionLocal = sessionmaker(async_engine, expire_on_commit=False, class_=AsyncSession)
+Base = declarative_base()
+
+
+
+DEFAULT_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
+
+logger = Logger(name="MyAsyncLogger")
+
+
+async def configure_logger():
+    # Create and add the custom file handler
+    # file_handler = AsyncFileHandler(filename=log_file_path)
+    # file_handler.formatter = Formatter(fmt=DEFAULT_FORMAT)
+    # logger.add_handler(file_handler)
+
+    # Create and add a customized shell (stdout) streaming handler
+    formatter = Formatter(fmt=DEFAULT_FORMAT)
+    stream_handler = AsyncStreamHandler(stream=sys.stdout, formatter=formatter)
+    logger.add_handler(stream_handler)
+
+    await logger.info('Logger setup!!!!!!!!!!!!!!!!')
+
+    # Ensure the log file is deleted if it exists
+    # if os.path.exists(log_file_path):
+    #     os.remove(log_file_path)
+    #     await logger.info(f'Removing existing log file: {log_file_path}')
+
+async def create_tables(tickers):
+    async with async_engine.begin() as conn:
+        # Dynamically create a model for each ticker and create table
+        for ticker in tickers:
+            model = option_ticker_model(ticker)  # Synchronous call within an async block
+            await conn.run_sync(model.__table__.create, checkfirst=True)
+            await logger.info(f"{ticker} table crated!")
+
+
+async def convert_to_hypertables(tickers):
+    async with async_engine.connect() as conn:
+        await conn.begin()
+        for ticker in tickers:
+            tablename = ticker.replace('.', '_').lower()
+            try:
+                # Use the text() construct to ensure the SQL command is executed as a raw string
+                await conn.execute(text(f"SELECT create_hypertable('{tablename}', 'timestamp_ms');"))
+                await conn.commit()  # Commit the transaction
+                await logger.info(f"{ticker} HYPER TABLE  created!")
+            except Exception as e:
+                await conn.rollback()  # Rollback in case of an error
+                print(f"Could not convert {tablename} to hypertable: {e}")
+
+
+# async def convert_to_hypertables(tickers):
+#     async with async_engine.connect() as conn:
+#         for ticker in tickers:
+#             tablename = ticker.replace('.', '_').lower()
+#             try:
+#                 await conn.execute(f"SELECT create_hypertable('{tablename}', 'timestamp');")
+#             except Exception as e:
+#                 print(f"Could not convert {tablename} to hypertable: {e}")
+
+def get_channels():
+
+    channels_call_23feb = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-C.agg2' for k in range(40, 60, 2)]
+    channels_put_23_feb = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-P.agg2' for k in range(40, 60, 2)]
+    channels_call_29mar = [f'ticker.BTC-29MAR24-{str(int(k*1000))}-C.agg2' for k in range(40, 60, 2)]
+    channels_put_29mar = [f'ticker.BTC-29MAR24-{str(int(k*1000))}-P.agg2' for k in range(40, 60, 2)]
+    return channels_call_23feb + channels_put_23_feb  + channels_call_29mar + channels_put_29mar
+
+async def insert_into_timescale(data, ticker_name):
+    # Dynamically create a model class based on the ticker name
+    MarketDataModel = option_ticker_model(ticker_name)  # Adjust based on your actual factory function name
+
+    # Use the async session for database operations
+    async with AsyncSessionLocal() as session:
+        async with session.begin():
+            # Create an instance of the model with the provided data
+            new_entry = MarketDataModel(**data)
+            # print(data)
+            session.add(new_entry)
+            # No need for explicit session.commit() due to the context manager
+
+def convert_timestamp(timestamp_ms):
+    """Converts a timestamp in milliseconds to a timezone-aware datetime object."""
+    return datetime.fromtimestamp(timestamp_ms / 1000.0, tz=timezone.utc)
+
+def option_ticker_model(ticker):
+    # {'estimated_delivery_price': 48155.23, 'best_bid_amount': 0.9, 'best_ask_amount': 0.9, 'bid_iv': 0.0,
+    #  'ask_iv': 999.0, 'underlying_index': 'BTC-23FEB24', 'underlying_price': 48390.5, 'mark_iv': 49.38,
+    #  'best_bid_price': 0.0001, 'best_ask_price': 15.0, 'interest_rate': 0.0, 'mark_price': 0.0697, 'open_interest': 0.5,
+    #  'max_price': 0.114, 'min_price': 0.038, 'settlement_price': 0.06846742, 'last_price': 0.276,
+    #  'instrument_name': 'BTC-23FEB24-51000-P', 'index_price': 48155.23, 'state': 'open',
+    #  'timestamp_utc': datetime.datetime(2024, 2, 11, 9, 1, 28, 641000, tzinfo=datetime.timezone.utc),
+    #  'timestamp_ms': 1707642088641, 'volume_usd': 0.0, 'volume': 0.0, 'price_change': None, 'low': None, 'high': None,
+    #  'rho': -12.30382, 'theta': -62.26424, 'vega': 30.15361, 'gamma': 8e-05, 'delta': -0.70641,
+    #  '_id': ObjectId('65c88cdf02d59f62074a43a8')}
+
+    class OptionsData(Base):
+        __tablename__ = ticker.replace('.', '_').lower()
+
+        __table_args__ = (UniqueConstraint('timestamp_ms', name=f"uix_ts_{ticker.replace('.', '_').lower()}"),  {'extend_existing': True},)
+
+        # id = Column(BigInteger, , autoincrement=True)
+        timestamp_ms = Column(BIGINT, primary_key=True)
+        funding_8h = Column(Numeric)
+        current_funding = Column(Numeric)
+        interest_value = Column(Numeric)
+        estimated_delivery_price = Column(Numeric)
+        best_bid_amount = Column(Float)
+        best_ask_amount = Column(Float)
+        bid_iv = Column(Float)
+        ask_iv = Column(Float)
+        underlying_index = Column(String)
+        underlying_price = Column(Numeric)
+        mark_iv = Column(Float)
+        best_bid_price = Column(Numeric)
+        best_ask_price = Column(Numeric)
+        interest_rate = Column(Float)
+        mark_price = Column(Numeric)
+        open_interest = Column(Float)
+        max_price = Column(Numeric)
+        min_price = Column(Numeric)
+        settlement_price = Column(Numeric)
+        last_price = Column(Numeric)
+        instrument_name = Column(String)
+        index_price = Column(Numeric)
+        rho = Column(Float)
+        theta = Column(Float)
+        vega = Column(Float)
+        gamma = Column(Float)
+        delta = Column(Float)
+        volume_usd = Column(Numeric)
+        volume = Column(Float)
+        volume_notional = Column(Float)
+        price_change = Column(Float)
+        low = Column(Numeric)
+        high = Column(Numeric)
+        state = Column(String)
+        timestamp_utc = Column(DateTime(timezone=True))
+
+
+    return OptionsData
+
 
 async def insert_document(db, document, ticker):
     try:
         # Attempt to insert a document into MongoDB
         await db[ticker].insert_one(document)
-        print(f"Inserted into mongodb.............{ticker}...................")
+        # print(f"Inserted into mongodb.............{ticker}...................")
     except PyMongoError as e:
         print(f"MongoDB error: {e}, document could not be inserted.")
         # Implement retry logic or error handling as needed
@@ -45,13 +220,11 @@ async def insert_document(db, document, ticker):
 # {"jsonrpc":"2.0","method":"subscription",
 #  "params":{"channel":"ticker.BTC-23FEB24-45000-C.agg2",
 #            "data":
-#            {"estimated_delivery_price":48321.99,"best_bid_amount":32.3,"best_ask_amount":32.4,"bid_iv":37.0,"ask_iv":56.44,"underlying_index":"BTC-23FEB24","underlying_price":48559.14,"mark_iv":46.17,"best_bid_price":0.0775,"best_ask_price":0.0865,"interest_rate":0.0,"mark_price":0.0815,"open_interest":1716.9,"max_price":0.117,"min_price":0.0515,"settlement_price":0.06076527,"last_price":0.085,"instrument_name":"BTC-23FEB24-45000-C","index_price":48321.99,
-#            "greeks":{"rho":12.04475,"theta":-42.9504,"vega":22.55662,"gamma":0.00006,"delta":0.82809},
-#            "stats":{"volume_usd":154419.3,"volume":52.3,"price_change":36.0,"low":0.0605,"high":0.085},
-#            "state":"open","timestamp":1707627659690}}}
+#            {"estimated_delivery_price":48321.99,"best_bid_amount":32.3,"best_ask_amount":32.4,"bid_iv":37.0,"ask_iv":56.44,"underlying_index":"BTC-23FEB24","underlying_price":48559.14,"mark_iv":46.17,"best_bid_price":0.0775,"best_ask_price":0.0865,"interest_rate":0.0,"mark_price":0.0815,"open_interest":1716.9,"max_price":0.117,"min_price":0.0515,"settlement_price":0.06076527,"last_price":0.085,"instrument_name":"BTC-23FEB24-45000-C","index_price":48321.99, "rho":12.04475,"theta":-42.9504,"vega":22.55662,"gamma":0.00006,"delta":0.82809, "volume_usd":154419.3,"volume":52.3,"price_change":36.0,"low":0.0605,"high":0.085, "state":"open","timestamp":1707627659690}
 
 async def consume_messages(consumer, db):
     while True:
+        cnt = 0
         try:
             # Fetch messages
             async for message in consumer:
@@ -64,41 +237,73 @@ async def consume_messages(consumer, db):
                         print( 'setup data only.........')
                         continue
 
-
                     tick_data = data['params']['data']
+
+                    tick_data['timestamp_utc'] = convert_timestamp(tick_data['timestamp'])
+                    tick_data['timestamp_ms'] = tick_data.pop('timestamp')
                     # Remove the 'stats' entry and capture its value
                     stats = tick_data.pop('stats')
                     tick_data.update(stats)
+
+                    # if 'funding_8h' in tick_data:
+                    #     tick_data.pop('funding_8h')
 
                     if 'greeks' in tick_data:
                         greeks = tick_data.pop('greeks')
                         tick_data.update(greeks)
 
                     # Merge the 'stats' dictionary with the original dictionary
-
-
                     ticker_name =  data['params']['channel']
                     # Insert the data into MongoDB, with error handling
-                    await insert_document(db, tick_data, ticker_name)
+
+                    # logger.info(f'{ticker_name}, {tick_data}')
+
+                    try:
+                        await insert_into_timescale(tick_data, ticker_name)
+                        # print("TIMESCALE inserted successfully.", ticker_name)
+                    except Exception as e:
+                        # Basic error checking
+                        await logger.error(f"Timescale - An error occurred during data insertion: {e}")
+
+
+                    try:
+                        await insert_document(db, tick_data, ticker_name)
+                        # print("MONGO inserted successfully.", ticker_name)
+                    except PyMongoError as e:
+                        await logger.error(f"MongoDB error: {e}")
+
+                    cnt = cnt + 1
+                    if cnt % 100 == 0:
+                        logger.info(f'Inserted: {ticker_name}, record: {cnt}, --- {tick_data}')
                 except json.JSONDecodeError:
-                    print("Error decoding JSON")
+                    logger.error("Error decoding JSON")
         except KafkaError as e:
-            print(f"Kafka error: {e}, attempting to reconnect...")
+            logger.error(f"Kafka error: {e}, attempting to reconnect...")
             await asyncio.sleep(5)  # Wait a bit before trying to consume again
         except Exception as e:
-            print(f"Unexpected error: {e}, attempting to reconnect...")
+            logger.error(f"Unexpected error: {e}, attempting to reconnect...")
+            logger.error(data)
             await asyncio.sleep(5)  # Wait a bit before trying to consume again
 
 async def main():
+    await configure_logger()
+
+    tickers = get_channels()
+    await create_tables(tickers)
+    await convert_to_hypertables(tickers)
+
     mongo_client = AsyncIOMotorClient(MONGO_DETAILS)
     db = mongo_client[DATABASE_NAME]
 
     consumer = AIOKafkaConsumer(
         KAFKA_TOPIC,
         bootstrap_servers=KAFKA_SERVERS,
-        auto_offset_reset='earliest'  # Start reading at the earliest message
+        auto_offset_reset='latest'  # Start reading at the earliest message
+        # auto_offset_reset='earliest'  # Start reading at the earliest message
     )
     await consumer.start()
+
+    await logger.info('Started consumer.........................................................')
     try:
         await consume_messages(consumer, db)
     finally:
@@ -106,4 +311,5 @@ async def main():
         mongo_client.close()
 
 if __name__ == '__main__':
+
     asyncio.run(main())

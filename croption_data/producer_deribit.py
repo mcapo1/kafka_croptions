@@ -26,9 +26,11 @@ async def produce_to_kafka(producer, topic, message):
 
 def get_channels():
 
-    channels_call_ = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-C.agg2' for k in range(40, 56, 1)]
-    channels_put_ = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-P.agg2' for k in range(40, 56, 1)]
-    return channels_put_ + channels_call_ + ['ticker.BTC-PERPETUAL.agg2']
+    channels_call_23feb = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-C.agg2' for k in range(40, 60, 2)]
+    channels_put_23_feb = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-P.agg2' for k in range(40, 60, 2)]
+    channels_call_29mar = [f'ticker.BTC-29MAR24-{str(int(k*1000))}-C.agg2' for k in range(40, 60, 2)]
+    channels_put_29mar = [f'ticker.BTC-29MAR24-{str(int(k*1000))}-P.agg2' for k in range(40, 60, 2)]
+    return channels_call_23feb + channels_put_23_feb  + channels_call_29mar + channels_put_29mar
 #
 # {"jsonrpc":"2.0","method":"subscription",
 #  "params":{"channel":"ticker.BTC-23FEB24-45000-C.agg2",

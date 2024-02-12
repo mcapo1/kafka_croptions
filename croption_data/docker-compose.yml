@@ -1,5 +1,5 @@
 # docker-compose.yml
-version: "3.7"
+version: "3.8"
 services:
   zookeeper:
     restart: always
@@ -27,6 +27,18 @@ services:
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
     depends_on:
       - zookeeper
+
+  timescaledb:
+      image: timescale/timescaledb:latest-pg14
+      ports:
+        - "5432:5432"
+      environment:
+        POSTGRES_USER: team  # Replace 'rootusername' with your desired superuser name
+        POSTGRES_PASSWORD: Python123  # Replace 'rootpassword' with your desired password
+      volumes:
+        - ./data/timescale/db-data:/var/lib/postgresql/data
+
+
   mongo:
     container_name: mongo
     restart: always
@@ -43,3 +55,4 @@ services:
 volumes:
   kafka-volume:
   zookeeper-volume:
+  timescaledb-data:
