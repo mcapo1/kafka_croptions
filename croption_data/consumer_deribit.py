@@ -314,7 +314,13 @@ async def main():
         KAFKA_TOPIC,
         bootstrap_servers=KAFKA_SERVERS,
         # auto_offset_reset='latest'  # Start reading at the earliest message
-        auto_offset_reset='latest'  # Start reading at the earliest message
+        auto_offset_reset='latest'  ,# Start reading at the earliest message
+
+        max_poll_records = 10,
+        fetch_min_bytes = 1,
+        fetch_max_wait_ms = 500,
+            # Note: `fetch_max_bytes` is not directly configurable in aiokafka, you can control it per partition with `max_partition_fetch_bytes`
+        max_partition_fetch_bytes = 1 * 1024 * 1024,  # 1MB
     )
 
     await consumer.start()
