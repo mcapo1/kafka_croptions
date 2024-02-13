@@ -5,7 +5,7 @@ from aiokafka import AIOKafkaProducer
 from kafka.errors import KafkaError
 
 # Kafka configuration
-KAFKA_TOPIC = 'real_time_data'
+KAFKA_TOPIC = 'real_time_data_options'
 KAFKA_SERVERS = 'localhost:9093'
 
 uri = 'wss://deribit.com/ws/api/v2'

@@ -22,12 +22,12 @@ from sqlalchemy.orm import sessionmaker
 import asyncio
 # MongoDB configuration
 MONGO_DETAILS = "mongodb://team:Python123@localhost:27018/"
-DATABASE_NAME = "deribit_options_1"
+DATABASE_NAME = "deribit_options_data"
 # COLLECTION_NAME = "ticker111"
 
 from datetime import datetime, timezone
 # Kafka configuration
-KAFKA_TOPIC = 'real_time_data'
+KAFKA_TOPIC = 'real_time_data_options'
 KAFKA_SERVERS = 'localhost:9093'
 
 from sqlalchemy.ext.asyncio import async_scoped_session
@@ -42,7 +42,7 @@ from sqlalchemy.sql import text
 from sqlalchemy.dialects.postgresql import BIGINT
 from sqlalchemy.schema import UniqueConstraint
 
-DATABASE_URI = f'postgresql+asyncpg://team:Python123@localhost/postgres'
+DATABASE_URI = f'postgresql+asyncpg://team:Python123@localhost/deribit_options'
 # async_engine = create_async_engine(DATABASE_URI, echo=True)
 async_engine: AsyncEngine = create_async_engine(DATABASE_URI)
 AsyncSessionLocal = sessionmaker(async_engine, expire_on_commit=False, class_=AsyncSession)
@@ -185,7 +185,6 @@ def option_ticker_model(ticker):
 
     return OptionsData
 
-
 async def insert_document(db, document, ticker):
     try:
         # Attempt to insert a document into MongoDB
@@ -218,7 +217,6 @@ async def insert_document(db, document, ticker):
 #  "params":{"channel":"ticker.BTC-23FEB24-45000-C.agg2",
 #            "data":
 #            {"estimated_delivery_price":48321.99,"best_bid_amount":32.3,"best_ask_amount":32.4,"bid_iv":37.0,"ask_iv":56.44,"underlying_index":"BTC-23FEB24","underlying_price":48559.14,"mark_iv":46.17,"best_bid_price":0.0775,"best_ask_price":0.0865,"interest_rate":0.0,"mark_price":0.0815,"open_interest":1716.9,"max_price":0.117,"min_price":0.0515,"settlement_price":0.06076527,"last_price":0.085,"instrument_name":"BTC-23FEB24-45000-C","index_price":48321.99, "rho":12.04475,"theta":-42.9504,"vega":22.55662,"gamma":0.00006,"delta":0.82809, "volume_usd":154419.3,"volume":52.3,"price_change":36.0,"low":0.0605,"high":0.085, "state":"open","timestamp":1707627659690}
-
 async def consume_messages(consumer, db):
     while True:
         cnt = 0
@@ -282,6 +280,17 @@ async def consume_messages(consumer, db):
             logger.error(data)
             await asyncio.sleep(5)  # Wait a bit before trying to consume again
 
+
+async def setup_ts_index_mongo(db):
+    from pymongo import MongoClient
+    cls = get_channels()
+    # loop thorugh collections and crate index
+    for cl in cls:
+        collection = db[cl.replace('.', '_').lower()]  # Replace with your actual collection name
+       # Create a unique index on the 'timestamp_ms' field
+        collection.create_index([('timestamp_ms', 1)], unique=True)
+
+
 async def main():
     await configure_logger()
 
@@ -292,13 +301,18 @@ async def main():
     mongo_client = AsyncIOMotorClient(MONGO_DETAILS)
     db = mongo_client[DATABASE_NAME]
 
+    # setup indexs and tables
+    await setup_ts_index_mongo(db)
+
     consumer = AIOKafkaConsumer(
         KAFKA_TOPIC,
         bootstrap_servers=KAFKA_SERVERS,
         # auto_offset_reset='latest'  # Start reading at the earliest message
         auto_offset_reset='earliest'  # Start reading at the earliest message
     )
+
     await consumer.start()
+    await logger.info('Consumer started................')
 
     await logger.info('Started consumer.........................................................')
     try:
