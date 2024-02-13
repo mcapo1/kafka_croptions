@@ -220,6 +220,7 @@ async def insert_document(db, document, ticker):
 async def consume_messages(consumer, db):
     while True:
         cnt = 0
+        cnt_error = 0
         try:
             # Fetch messages
             async for message in consumer:
@@ -258,7 +259,9 @@ async def consume_messages(consumer, db):
                         # print("TIMESCALE inserted successfully.", ticker_name)
                     except Exception as e:
                         # Basic error checking
-                        await logger.error(f"Timescale - An error occurred during data insertion: {e}")
+                        cnt_error += 1
+                        if cnt_error%50==0:
+                            await logger.error(f"Timescale - An error occurred during data insertion: {e}")
 
 
                     try:
@@ -288,7 +291,7 @@ async def setup_ts_index_mongo(db):
     for cl in cls:
         collection = db[cl.replace('.', '_').lower()]  # Replace with your actual collection name
        # Create a unique index on the 'timestamp_ms' field
-        collection.create_index([('timestamp_ms', 1)], unique=True)
+        await collection.create_index([('timestamp_ms', 1)], unique=True)
         await logger.info(f'Index created for {cl}')
 
 
