@@ -289,10 +289,12 @@ async def setup_ts_index_mongo(db):
     cls = get_channels()
     # loop thorugh collections and crate index
     for cl in cls:
-        collection = db[cl.replace('.', '_').lower()]  # Replace with your actual collection name
+        cl_name = cl.replace('.', '_').lower()
+        collection = db[cl_name]  # Replace with your actual collection name
        # Create a unique index on the 'timestamp_ms' field
-        await collection.create_index([('timestamp_ms', 1)], unique=True)
-        await logger.info(f'Index created for {cl}')
+        index_name  = await collection.create_index([('timestamp_ms', 1)], unique=True)
+
+        await logger.info(f'Index created for {cl} with name {index_name}')
 
 
 async def main():
@@ -312,7 +314,7 @@ async def main():
         KAFKA_TOPIC,
         bootstrap_servers=KAFKA_SERVERS,
         # auto_offset_reset='latest'  # Start reading at the earliest message
-        auto_offset_reset='earliest'  # Start reading at the earliest message
+        auto_offset_reset='latest'  # Start reading at the earliest message
     )
 
     await consumer.start()
