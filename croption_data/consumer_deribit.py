@@ -48,12 +48,9 @@ async_engine: AsyncEngine = create_async_engine(DATABASE_URI)
 AsyncSessionLocal = sessionmaker(async_engine, expire_on_commit=False, class_=AsyncSession)
 Base = declarative_base()
 
-
-
 DEFAULT_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
 
 logger = Logger(name="MyAsyncLogger")
-
 
 async def configure_logger():
     # Create and add the custom file handler
@@ -298,8 +295,8 @@ async def main():
     consumer = AIOKafkaConsumer(
         KAFKA_TOPIC,
         bootstrap_servers=KAFKA_SERVERS,
-        auto_offset_reset='latest'  # Start reading at the earliest message
-        # auto_offset_reset='earliest'  # Start reading at the earliest message
+        # auto_offset_reset='latest'  # Start reading at the earliest message
+        auto_offset_reset='earliest'  # Start reading at the earliest message
     )
     await consumer.start()
 
