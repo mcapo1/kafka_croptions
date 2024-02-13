@@ -289,6 +289,7 @@ async def setup_ts_index_mongo(db):
         collection = db[cl.replace('.', '_').lower()]  # Replace with your actual collection name
        # Create a unique index on the 'timestamp_ms' field
         collection.create_index([('timestamp_ms', 1)], unique=True)
+        await logger.info(f'Index created for {cl}')
 
 
 async def main():
