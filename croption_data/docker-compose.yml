@@ -52,6 +52,28 @@ services:
       - ./data/mongo/db-data:/data/db # persist data even if container shuts down
     ports:
       - 27018:27017
+
+  spark-master:
+    image: bitnami/spark:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data/spark/db-data:/bitnami/spark
+    environment:
+      - SPARK_MODE=master
+
+  spark-worker:
+    image: bitnami/spark:latest
+    ports:
+      - "8081:8081" # Optionally expose different ports for each worker if needed
+    volumes:
+      - ./data/spark/db-data:/bitnami/spark
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+    depends_on:
+      - spark-master
+
 volumes:
   kafka-volume:
   zookeeper-volume:

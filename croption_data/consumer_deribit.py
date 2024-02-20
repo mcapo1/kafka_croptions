@@ -52,6 +52,9 @@ DEFAULT_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
 
 logger = Logger(name="MyAsyncLogger")
 
+
+# Cache for storing model classes
+model_cache = {}
 async def configure_logger():
     # Create and add the custom file handler
     # file_handler = AsyncFileHandler(filename=log_file_path)
@@ -129,6 +132,9 @@ def convert_timestamp(timestamp_ms):
     return datetime.fromtimestamp(timestamp_ms / 1000.0, tz=timezone.utc)
 
 def option_ticker_model(ticker):
+
+    if ticker in model_cache:
+        return model_cache[ticker]
     # {'estimated_delivery_price': 48155.23, 'best_bid_amount': 0.9, 'best_ask_amount': 0.9, 'bid_iv': 0.0,
     #  'ask_iv': 999.0, 'underlying_index': 'BTC-23FEB24', 'underlying_price': 48390.5, 'mark_iv': 49.38,
     #  'best_bid_price': 0.0001, 'best_ask_price': 15.0, 'interest_rate': 0.0, 'mark_price': 0.0697, 'open_interest': 0.5,
@@ -181,6 +187,8 @@ def option_ticker_model(ticker):
         high = Column(Numeric)
         state = Column(String)
         timestamp_utc = Column(DateTime(timezone=True))
+
+    model_cache[ticker] = OptionsData
 
 
     return OptionsData
