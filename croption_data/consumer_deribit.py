@@ -257,7 +257,7 @@ async def consume_messages(consumer, db):
                         tick_data.update(greeks)
 
                     # Merge the 'stats' dictionary with the original dictionary
-                    ticker_name =  data['params']['channel']
+                    ticker_name =  data['params']['channel'].replace('.', '_').lower()
                     # Insert the data into MongoDB, with error handling
 
                     # logger.info(f'{ticker_name}, {tick_data}')
