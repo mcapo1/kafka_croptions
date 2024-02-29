@@ -22,7 +22,7 @@ from sqlalchemy.orm import sessionmaker
 import asyncio
 # MongoDB configuration
 MONGO_DETAILS = "mongodb://team:Python123@localhost:27018/"
-DATABASE_NAME = "deribit_options_data"
+DATABASE_NAME = "deribit_options_data_mar24"
 # COLLECTION_NAME = "ticker111"
 
 from datetime import datetime, timezone
@@ -108,11 +108,11 @@ async def convert_to_hypertables(tickers):
 
 def get_channels():
 
-    channels_call_23feb = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-C.agg2' for k in range(40, 60, 2)]
-    channels_put_23_feb = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-P.agg2' for k in range(40, 60, 2)]
-    # channels_call_29mar = [f'ticker.BTC-29MAR24-{str(int(k*1000))}-C.agg2' for k in range(40, 60, 2)]
-    # channels_put_29mar = [f'ticker.BTC-29MAR24-{str(int(k*1000))}-P.agg2' for k in range(40, 60, 2)]
-    return channels_call_23feb + channels_put_23_feb # + channels_call_29mar + channels_put_29mar
+    # channels_call_23feb = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-C.agg2' for k in range(40, 60, 2)]
+    # channels_put_23_feb = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-P.agg2' for k in range(40, 60, 2)]
+    channels_call_29mar = [f'ticker.BTC-29MAR24-{str(int(k*1000))}-C.agg2' for k in range(40, 60, 2)]
+    channels_put_29mar = [f'ticker.BTC-29MAR24-{str(int(k*1000))}-P.agg2' for k in range(40, 60, 2)]
+    return  channels_call_29mar + channels_put_29mar
 
 async def insert_into_timescale(data, ticker_name):
     # Dynamically create a model class based on the ticker name
