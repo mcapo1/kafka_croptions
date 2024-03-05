@@ -112,7 +112,7 @@ def get_channels():
     # channels_put_23_feb = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-P.agg2' for k in range(40, 60, 2)]
     channels_call_29mar = [f'ticker.BTC-29MAR24-{str(int(k*1000))}-C.agg2' for k in range(50, 72, 2)]
     channels_put_29mar = [f'ticker.BTC-29MAR24-{str(int(k*1000))}-P.agg2' for k in range(50, 72, 2)]
-    return  channels_call_29mar + channels_put_29mar
+    return  channels_call_29mar + channels_put_29mar + ['ticker.BTC-PERPETUAL.agg2']
 
 async def insert_into_timescale(data, ticker_name):
     # Dynamically create a model class based on the ticker name
