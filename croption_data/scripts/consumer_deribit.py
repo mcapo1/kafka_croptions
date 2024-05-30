@@ -18,22 +18,19 @@ from aiologger.levels import LogLevel
 from aiologger.formatters.base import Formatter
 from aiologger.handlers.streams import AsyncStreamHandler
 
-
-from utils.option_utils import get_next_8_UTC_date_str, get_startup_channels
-import re
-
-
 from sqlalchemy.orm import sessionmaker
 import asyncio
 # MongoDB configuration
-MONGO_DETAILS = "mongodb://team:Python123@localhost:27018/"
-DATABASE_NAME = "deribit_options_data_mar24"
+MONGO_DETAILS = "mongodb://team:Python123@mongo:27017/"
+DATABASE_NAME = "deribit_demo"
 # COLLECTION_NAME = "ticker111"
 
 from datetime import datetime, timezone
 # Kafka configuration
 KAFKA_TOPIC = 'real_time_data_options'
-KAFKA_SERVERS = 'localhost:9093'
+KAFKA_SERVERS = 'kafka:9092'
+# Change the Kafka broker address from "localhost:9093" to:
+# KAFKA_SERVERS = "host.docker.internal:9093"
 
 from sqlalchemy.ext.asyncio import async_scoped_session
 
@@ -47,7 +44,7 @@ from sqlalchemy.sql import text
 from sqlalchemy.dialects.postgresql import BIGINT
 from sqlalchemy.schema import UniqueConstraint
 
-DATABASE_URI = f'postgresql+asyncpg://team:Python123@localhost/postgres'
+DATABASE_URI = f'postgresql+asyncpg://team:Python123@timescaledb/postgres'
 # async_engine = create_async_engine(DATABASE_URI, echo=True)
 async_engine: AsyncEngine = create_async_engine(DATABASE_URI)
 AsyncSessionLocal = sessionmaker(async_engine, expire_on_commit=False, class_=AsyncSession)
@@ -57,10 +54,9 @@ DEFAULT_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
 
 logger = Logger(name="MyAsyncLogger")
 
+
 # Cache for storing model classes
 model_cache = {}
-
-pattern = re.compile(r'\d{1,2}[A-Za-z]{3}\d{2}')
 async def configure_logger():
     # Create and add the custom file handler
     # file_handler = AsyncFileHandler(filename=log_file_path)
@@ -87,6 +83,7 @@ async def create_tables(tickers):
             await conn.run_sync(model.__table__.create, checkfirst=True)
             await logger.info(f"{ticker} table crated!")
 
+
 async def convert_to_hypertables(tickers):
     async with async_engine.connect() as conn:
         await conn.begin()
@@ -101,6 +98,7 @@ async def convert_to_hypertables(tickers):
                 await conn.rollback()  # Rollback in case of an error
                 print(f"Could not convert {tablename} to hypertable: {e}")
 
+
 # async def convert_to_hypertables(tickers):
 #     async with async_engine.connect() as conn:
 #         for ticker in tickers:
@@ -109,15 +107,15 @@ async def convert_to_hypertables(tickers):
 #                 await conn.execute(f"SELECT create_hypertable('{tablename}', 'timestamp');")
 #             except Exception as e:
 #                 print(f"Could not convert {tablename} to hypertable: {e}")
-# def get_channels():
-#
-#     # channels_call_23feb = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-C.agg2' for k in range(40, 60, 2)]
-#     # channels_put_23_feb = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-P.agg2' for k in range(40, 60, 2)]
-#     channels_call_29mar = [f'ticker.BTC-29MAR24-{str(int(k*1000))}-C.agg2' for k in range(50, 72, 2)]
-#     channels_put_29mar = [f'ticker.BTC-29MAR24-{str(int(k*1000))}-P.agg2' for k in range(50, 72, 2)]
-#     # return  channels_call_29mar + channels_put_29mar + ['ticker.BTC-PERPETUAL.agg2']
-#     # return   ['ticker.BTC-PERPETUAL.agg2']
-#     return get_startup_channels(raw_or_agg2='agg2')
+
+def get_channels():
+
+    # channels_call_23feb = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-C.agg2' for k in range(40, 60, 2)]
+    # channels_put_23_feb = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-P.agg2' for k in range(40, 60, 2)]
+    channels_call_29mar = [f'ticker.BTC-29MAR24-{str(int(k*1000))}-C.agg2' for k in range(50, 72, 2)]
+    channels_put_29mar = [f'ticker.BTC-29MAR24-{str(int(k*1000))}-P.agg2' for k in range(50, 72, 2)]
+    # return  channels_call_29mar + channels_put_29mar + ['ticker.BTC-PERPETUAL.agg2']
+    return  ['ticker.BTC-PERPETUAL.agg2']
 
 async def insert_into_timescale(data, ticker_name):
     # Dynamically create a model class based on the ticker name
@@ -153,15 +151,10 @@ def option_ticker_model(ticker):
     class OptionsData(Base):
         __tablename__ = ticker.replace('.', '_').lower()
 
-        # __table_args__ = (UniqueConstraint('timestamp_ms', name=f"uix_ts_instrument_{ticker.replace('.', '_').lower()}"),  {'extend_existing': True},)
+        __table_args__ = (UniqueConstraint('timestamp_ms', name=f"uix_ts_{ticker.replace('.', '_').lower()}"),  {'extend_existing': True},)
 
-        __table_args__ = (
-            UniqueConstraint('timestamp_ms', 'instrument_name', name=f"uix_ts_instrument_{ticker.replace('.', '_').lower()}"),
-            {'extend_existing': True},
-        )
-
+        # id = Column(BigInteger, , autoincrement=True)
         timestamp_ms = Column(BIGINT, primary_key=True)
-        instrument_name = Column(String, primary_key=True)
         funding_8h = Column(Numeric)
         current_funding = Column(Numeric)
         interest_value = Column(Numeric)
@@ -182,6 +175,7 @@ def option_ticker_model(ticker):
         min_price = Column(Numeric)
         settlement_price = Column(Numeric)
         last_price = Column(Numeric)
+        instrument_name = Column(String)
         index_price = Column(Numeric)
         rho = Column(Float)
         theta = Column(Float)
@@ -210,6 +204,7 @@ async def insert_document(db, document, ticker):
     except PyMongoError as e:
         print(f"MongoDB error: {e}, document could not be inserted.")
         # Implement retry logic or error handling as needed
+
 
     # {'jsonrpc': '2.0', 'method': 'subscription', 'params': {'channel': 'ticker.BTC-PERPETUAL.agg2',
     #                                                         'data': {'funding_8h': 5.793e-05, 'current_funding': 0.0,
@@ -246,7 +241,7 @@ async def consume_messages(consumer, db):
                     # print(f"Consumed message: {data}")
 
                     if 'id' in data:
-                        print( f'setup data only.........{data}')
+                        print( 'setup data only.........')
                         continue
 
                     tick_data = data['params']['data']
@@ -263,17 +258,12 @@ async def consume_messages(consumer, db):
                     if 'greeks' in tick_data:
                         greeks = tick_data.pop('greeks')
                         tick_data.update(greeks)
-                        ticker_in = data['params']['channel'].lower()
 
-                        match = pattern.search(ticker_in)
-                        if match:
-                            ticker_name = 'btc_opt_' + match.group().lower()
-                        else:
-                            ticker_name = 'btc_fut_perp'
+                    # Merge the 'stats' dictionary with the original dictionary
+                    ticker_name =  data['params']['channel'].replace('.', '_').lower()
+                    # Insert the data into MongoDB, with error handling
 
-                    else:
-                        # print(tick_data)
-                        ticker_name = 'btc_fut_perp'
+                    # logger.info(f'{ticker_name}, {tick_data}')
 
                     try:
                         await insert_into_timescale(tick_data, ticker_name)
@@ -281,11 +271,12 @@ async def consume_messages(consumer, db):
                     except Exception as e:
                         # Basic error checking
                         cnt_error += 1
-                        if cnt_error%100==0:
+                        if cnt_error%10==0:
                             await logger.error(f"Timescale - An error occurred during data insertion: {e}")
+
+
                     try:
-                        pass
-                        # await insert_document(db, tick_data, ticker_name)
+                        await insert_document(db, tick_data, ticker_name)
                         # print("MONGO inserted successfully.", ticker_name)
                     except PyMongoError as e:
                         await logger.error(f"MongoDB error: {e}")
@@ -303,9 +294,10 @@ async def consume_messages(consumer, db):
             logger.error(data)
             await asyncio.sleep(5)  # Wait a bit before trying to consume again
 
+
 async def setup_ts_index_mongo(db):
     from pymongo import MongoClient
-    # cls = get_channels()
+    cls = get_channels()
     # loop thorugh collections and crate index
     for cl in cls:
         cl_name = cl.replace('.', '_').lower()
@@ -315,25 +307,19 @@ async def setup_ts_index_mongo(db):
 
         await logger.info(f'Index created for {cl} with name {index_name}')
 
-async def main():
 
-    ccy = 'BTC'
+async def main():
     await configure_logger()
 
-    # tickers = get_channels()
-
-    mat_array = [ccy.lower() + '_opt_' + get_next_8_UTC_date_str(i) for i in range(10)] + [ccy.lower() +  '_fut_perp']
-    print(mat_array)
-
-
-    await create_tables(mat_array)
-    await convert_to_hypertables(mat_array)
+    tickers = get_channels()
+    await create_tables(tickers)
+    await convert_to_hypertables(tickers)
 
     mongo_client = AsyncIOMotorClient(MONGO_DETAILS)
     db = mongo_client[DATABASE_NAME]
 
     # setup indexs and tables
-    # await setup_ts_index_mongo(db)
+    await setup_ts_index_mongo(db)
 
     consumer = AIOKafkaConsumer(
         KAFKA_TOPIC,
@@ -351,12 +337,12 @@ async def main():
     await consumer.start()
     await logger.info('Consumer started................')
 
-    await logger.info('Started consumer.......................................')
+    await logger.info('Started consumer.........................................................')
     try:
         await consume_messages(consumer, db)
     finally:
         await consumer.stop()
-        # mongo_client.close()
+        mongo_client.close()
 
 if __name__ == '__main__':
 

@@ -57,8 +57,9 @@ services:
     image: bitnami/spark:latest
     ports:
       - "8080:8080"
+      - "7077:7077"
     volumes:
-      - ./data/spark/db-data:/bitnami/spark
+      - ./data/spark/db-data:/opt/spark
     environment:
       - SPARK_MODE=master
 
@@ -66,14 +67,39 @@ services:
     image: bitnami/spark:latest
     ports:
       - "8081:8081" # Optionally expose different ports for each worker if needed
+      - "7078:7078"
     volumes:
-      - ./data/spark/db-data:/bitnami/spark
+      - ./data/spark/db-data:/opt/spark
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
     depends_on:
       - spark-master
 
+  ubuntu:
+    image: ubuntu:22.04
+    volumes:
+      - ./scripts:/workspace
+    working_dir: /workspace
+    command: /workspace/startup.sh
+    depends_on:
+      - spark-master
+
+  jupyterlab:
+    image: jupyter/pyspark-notebook
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebooks:/home/jovyan/work
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - PYSPARK_PYTHON=python3
+      - SPARK_OPTS=--packages io.delta:delta-core_2.12:x.x.x,org.apache.spark:spark-sql-kafka-0-10_2.12:x.x.x --conf spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog
+#      - JUPYTER_TOKEN=''
+#      - JUPYTER_PASSWORD=''
+    command: start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''
+    depends_on:
+      - spark-master
 volumes:
   kafka-volume:
   zookeeper-volume:

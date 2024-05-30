@@ -1,0 +1,8 @@
+aiokafka
+pymongo
+motor
+sqlalchemy
+asyncpg
+aiologger
+aiohttp
+kafka-python
