@@ -280,9 +280,9 @@ async def consume_messages(consumer, db):
                         # print("TIMESCALE inserted successfully.", ticker_name)
                     except Exception as e:
                         # Basic error checking
-                        cnt_error += 1
-                        if cnt_error%100==0:
-                            await logger.error(f"Timescale - An error occurred during data insertion: {e}")
+                        # cnt_error += 1
+                        # if cnt_error%100==0:
+                        await logger.error(f"Timescale - An error occurred during data insertion: {e}")
                     try:
                         pass
                         # await insert_document(db, tick_data, ticker_name)
@@ -292,7 +292,7 @@ async def consume_messages(consumer, db):
 
                     cnt = cnt + 1
                     if cnt % 100 == 0:
-                        logger.info(f'Inserted: {ticker_name}, record: {cnt}, --- {tick_data}')
+                        logger.info(f'{ticker_name}: {cnt}, --- {tick_data}')
                 except json.JSONDecodeError:
                     logger.error("Error decoding JSON")
         except KafkaError as e:
@@ -356,7 +356,7 @@ async def main():
         await consume_messages(consumer, db)
     finally:
         await consumer.stop()
-        # mongo_client.close()
+        mongo_client.close()
 
 if __name__ == '__main__':
 

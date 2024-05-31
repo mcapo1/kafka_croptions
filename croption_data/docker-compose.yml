@@ -38,7 +38,6 @@ services:
       volumes:
         - ./data/timescale/db-data:/var/lib/postgresql/data
 
-
   mongo:
     container_name: mongo
     restart: always

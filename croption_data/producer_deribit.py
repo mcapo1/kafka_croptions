@@ -27,14 +27,6 @@ DERIBIT_WS_API = "wss://www.deribit.com/ws/api/v2"
 
 scheduler = AsyncIOScheduler()
 
-#
-# {"jsonrpc":"2.0","method":"subscription",
-#  "params":{"channel":"ticker.BTC-23FEB24-45000-C.agg2",
-#            "data":
-#            {"estimated_delivery_price":48321.99,"best_bid_amount":32.3,"best_ask_amount":32.4,"bid_iv":37.0,"ask_iv":56.44,"underlying_index":"BTC-23FEB24","underlying_price":48559.14,"mark_iv":46.17,"best_bid_price":0.0775,"best_ask_price":0.0865,"interest_rate":0.0,"mark_price":0.0815,"open_interest":1716.9,"max_price":0.117,"min_price":0.0515,"settlement_price":0.06076527,"last_price":0.085,"instrument_name":"BTC-23FEB24-45000-C","index_price":48321.99,
-#            "greeks":{"rho":12.04475,"theta":-42.9504,"vega":22.55662,"gamma":0.00006,"delta":0.82809},
-#            "stats":{"volume_usd":154419.3,"volume":52.3,"price_change":36.0,"low":0.0605,"high":0.085},
-#            "state":"open","timestamp":1707627659690}}}
 def get_channels():
 
     # channels_call_23feb = [f'ticker.BTC-23FEB24-{str(int(k*1000))}-C.agg2' for k in range(40, 60, 2)]
@@ -56,6 +48,10 @@ async def produce_to_kafka(producer, topic, message):
 
 async def clear_and_subscribe_to_deribit(ws):  #takes ws as setup previously
 
+    print(f"******************************  UNSUB  ****************************")
+    print(f"******************************  UNSUB  ****************************")
+    print(f"******************************  UNSUB  ****************************")
+    print(f"******************************  UNSUB  ****************************")
     print(f"******************************  UNSUB  ****************************")
     unsub_json = {
               "jsonrpc" : "2.0",
@@ -88,50 +84,33 @@ async def clear_and_subscribe_to_deribit(ws):  #takes ws as setup previously
             }
     await ws.send_json(sub_json)
 
-
+job_id = 'daily_option_refresh'
+def add_job_if_not_exists(scheduler, job_id, func, trigger, args):
+    if scheduler.get_job(job_id):
+        scheduler.remove_job(job_id)
+        print(f"Removed existing job with ID '{job_id}'")
+    scheduler.add_job(func, trigger=trigger, id=job_id, args=args)
+    print(f"Added new job with ID '{job_id}'")
 async def consume_deribit_and_produce_kafka(producer, session):
-    retry_delay = 5  # Seconds to wait before retrying connection
+    retry_delay = 1  # Seconds to wait before retrying connection
     #
-    # {'jsonrpc': '2.0', 'method': 'subscription', 'params': {'channel': 'ticker.BTC-PERPETUAL.agg2',
-    #                                                         'data': {'funding_8h': 5.793e-05, 'current_funding': 0.0,
-    #                                                                  'estimated_delivery_price': 47220.96,
-    #                                                                  'best_bid_amount': 187500.0,
-    #                                                                  'best_ask_amount': 79180.0,
-    #                                                                  'best_bid_price': 47233.5,
-    #                                                                  'best_ask_price': 47234.0, 'mark_price': 47225.0,
-    #                                                                  'open_interest': 559267830, 'max_price': 47933.71,
-    #                                                                  'min_price': 46516.95,
-    #                                                                  'settlement_price': 47191.27,
-    #                                                                  'last_price': 47231.0,
-    #                                                                  'interest_value': 0.000941942703226156,
-    #                                                                  'instrument_name': 'BTC-PERPETUAL',
-    #                                                                  'index_price': 47220.96,
-#                                                                           'state': 'open',
-    #                                                                  'timestamp': 1707554242049}}}
+
 
     while True:
         cnt = 0
+        print( f'Consuming Deribit.....starting loop........................................')
         try:
             print('tryng to setup cx')
             async with session.ws_connect(DERIBIT_WS_API) as ws:
                 # Subscribe to a Deribit channel using ws.send_json for easier JSON handling
                 print('setup session')
-                await ws.send_json({
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "method": "public/subscribe",
-                    "params": {
-                        "channels": get_channels()
-                    }
-                })
-                print('sent requet.....')
-                ## setup daily refresh of options to get
 
-
-                scheduler.add_job(
+                # Add the job if it doesn't already exist
+                add_job_if_not_exists(
+                    scheduler,
+                    job_id,
                     clear_and_subscribe_to_deribit,
-                    trigger=CronTrigger(hour=8, minute=0, second=30, timezone='UTC'),
-                    # trigger=CronTrigger(minute="*"),
+                    trigger=CronTrigger(hour=8, minute=0, second=10, timezone= 'UTC'),
                     args=[ws]
                 )
 
@@ -140,18 +119,32 @@ async def consume_deribit_and_produce_kafka(producer, session):
                 else:
                     print("Scheduler is already running")
 
-                async for msg in ws:
-                    if msg.type == WSMsgType.TEXT:
-                        data = msg.data.strip()
-                        # print(data['params']['channel'], end=', ')
-                        # Produce the received message to Kafka
-                        await produce_to_kafka(producer, KAFKA_TOPIC, data)
-                        cnt +=1
-                        if cnt%100 ==0:
-                            print(f"{cnt}: {data}")
-                            # cnt =0
-                    elif msg.type in (WSMsgType.CLOSED, WSMsgType.ERROR):
-                        break
+                while True:
+                    try:
+                        await ws.send_json({
+                            "jsonrpc": "2.0",
+                            "id": 1,
+                            "method": "public/subscribe",
+                            "params": {
+                                "channels": get_channels()
+                            }
+                        })
+                        print('sent subscribe requet.....')
+                        async for msg in ws:
+                            if msg.type == WSMsgType.TEXT:
+                                data = msg.data.strip()
+                                await produce_to_kafka(producer, KAFKA_TOPIC, data)
+                                cnt += 1
+                                if cnt % 500 == 0:
+                                    print(f"{cnt}: {data}")
+                            elif msg.type in (WSMsgType.CLOSED, WSMsgType.ERROR):
+                                print('Non-text message received - error or closed')
+                                break
+                        print('FOR loop exited!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                    except Exception as e:
+                        print(f"Unexpected error in message loop: {e}, attempting to reconnect...")
+                        break  # Break out of the inner while loop to reconnect
+                print('WHILE loop exited!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         except (WSServerHandshakeError, ClientConnectorError) as e:
             print(f"WebSocket connection error: {e}, retrying in {retry_delay} seconds...")
             await asyncio.sleep(retry_delay)
@@ -169,7 +162,36 @@ async def main():
         # Ensure the producer is properly closed
         await producer.stop()
 
-
 if __name__ == '__main__':
 
     asyncio.run(main())
+
+
+
+    # {'jsonrpc': '2.0', 'method': 'subscription', 'params': {'channel': 'ticker.BTC-PERPETUAL.agg2',
+    #                                                         'data': {'funding_8h': 5.793e-05, 'current_funding': 0.0,
+    #                                                                  'estimated_delivery_price': 47220.96,
+    #                                                                  'best_bid_amount': 187500.0,
+    #                                                                  'best_ask_amount': 79180.0,
+    #                                                                  'best_bid_price': 47233.5,
+    #                                                                  'best_ask_price': 47234.0, 'mark_price': 47225.0,
+    #                                                                  'open_interest': 559267830, 'max_price': 47933.71,
+    #                                                                  'min_price': 46516.95,
+    #                                                                  'settlement_price': 47191.27,
+    #                                                                  'last_price': 47231.0,
+    #                                                                  'interest_value': 0.000941942703226156,
+    #                                                                  'instrument_name': 'BTC-PERPETUAL',
+    #                                                                  'index_price': 47220.96,
+#                                                                           'state': 'open',
+    #                                                                  'timestamp': 1707554242049}}}
+
+
+
+#
+# {"jsonrpc":"2.0","method":"subscription",
+#  "params":{"channel":"ticker.BTC-23FEB24-45000-C.agg2",
+#            "data":
+#            {"estimated_delivery_price":48321.99,"best_bid_amount":32.3,"best_ask_amount":32.4,"bid_iv":37.0,"ask_iv":56.44,"underlying_index":"BTC-23FEB24","underlying_price":48559.14,"mark_iv":46.17,"best_bid_price":0.0775,"best_ask_price":0.0865,"interest_rate":0.0,"mark_price":0.0815,"open_interest":1716.9,"max_price":0.117,"min_price":0.0515,"settlement_price":0.06076527,"last_price":0.085,"instrument_name":"BTC-23FEB24-45000-C","index_price":48321.99,
+#            "greeks":{"rho":12.04475,"theta":-42.9504,"vega":22.55662,"gamma":0.00006,"delta":0.82809},
+#            "stats":{"volume_usd":154419.3,"volume":52.3,"price_change":36.0,"low":0.0605,"high":0.085},
+#            "state":"open","timestamp":1707627659690}}}
