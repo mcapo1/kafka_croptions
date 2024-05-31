@@ -14,7 +14,8 @@ from utils.option_utils import get_startup_channels,get_day_n_options
 
 # Kafka configuration
 KAFKA_TOPIC = 'real_time_data_options'
-KAFKA_SERVERS = 'localhost:9093'
+# KAFKA_SERVERS = 'localhost:9093'
+KAFKA_SERVERS = 'kafka:9092'
 
 uri = 'wss://deribit.com/ws/api/v2'
 API_KEY = "E3vOgLRO"

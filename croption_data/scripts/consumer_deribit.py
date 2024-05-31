@@ -26,14 +26,15 @@ import re
 from sqlalchemy.orm import sessionmaker
 import asyncio
 # MongoDB configuration
-MONGO_DETAILS = "mongodb://team:Python123@localhost:27018/"
-DATABASE_NAME = "deribit_options_data_mar24"
+MONGO_DETAILS = "mongodb://team:Python123@mongo:27017/"
+DATABASE_NAME = "deribit_options_data"
 # COLLECTION_NAME = "ticker111"
 
 from datetime import datetime, timezone
 # Kafka configuration
 KAFKA_TOPIC = 'real_time_data_options'
-KAFKA_SERVERS = 'localhost:9093'
+# KAFKA_SERVERS = 'localhost:9093'
+KAFKA_SERVERS = 'kafka:9092'
 
 from sqlalchemy.ext.asyncio import async_scoped_session
 
@@ -47,7 +48,8 @@ from sqlalchemy.sql import text
 from sqlalchemy.dialects.postgresql import BIGINT
 from sqlalchemy.schema import UniqueConstraint
 
-DATABASE_URI = f'postgresql+asyncpg://team:Python123@localhost/postgres'
+# DATABASE_URI = f'postgresql+asyncpg://team:Python123@localhost/postgres'
+DATABASE_URI = f'postgresql+asyncpg://team:Python123@timescaledb/postgres'
 # async_engine = create_async_engine(DATABASE_URI, echo=True)
 async_engine: AsyncEngine = create_async_engine(DATABASE_URI)
 AsyncSessionLocal = sessionmaker(async_engine, expire_on_commit=False, class_=AsyncSession)
