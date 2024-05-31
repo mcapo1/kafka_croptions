@@ -6,3 +6,5 @@ asyncpg
 aiologger
 aiohttp
 kafka-python
+apscheduler
+requests
