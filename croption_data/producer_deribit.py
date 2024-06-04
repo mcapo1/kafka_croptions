@@ -135,7 +135,7 @@ async def consume_deribit_and_produce_kafka(producer, session):
                                 data = msg.data.strip()
                                 await produce_to_kafka(producer, KAFKA_TOPIC, data)
                                 cnt += 1
-                                if cnt % 500 == 0:
+                                if cnt % 200 == 0:
                                     print(f"{cnt}: {data}")
                             elif msg.type in (WSMsgType.CLOSED, WSMsgType.ERROR):
                                 print('Non-text message received - error or closed')
