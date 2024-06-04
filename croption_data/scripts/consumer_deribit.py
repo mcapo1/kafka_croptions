@@ -293,7 +293,10 @@ async def consume_messages(consumer, db):
                         await logger.error(f"MongoDB error: {e}")
 
                     cnt = cnt + 1
-                    if cnt % 100 == 0:
+
+                    await consumer.commit()
+
+                    if cnt % 200 == 0:
                         logger.info(f'{cnt}: {tick_data}')
                 except json.JSONDecodeError:
                     logger.error("Error decoding JSON")
