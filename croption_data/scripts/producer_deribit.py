@@ -120,31 +120,30 @@ async def consume_deribit_and_produce_kafka(producer, session):
                 else:
                     print("Scheduler is already running")
 
-                while True:
-                    try:
-                        await ws.send_json({
-                            "jsonrpc": "2.0",
-                            "id": 1,
-                            "method": "public/subscribe",
-                            "params": {
-                                "channels": get_channels()
-                            }
-                        })
-                        print('sent subscribe requet.....')
-                        async for msg in ws:
-                            if msg.type == WSMsgType.TEXT:
-                                data = msg.data.strip()
-                                await produce_to_kafka(producer, KAFKA_TOPIC, data)
-                                cnt += 1
-                                if cnt % 500 == 0:
-                                    print(f"{cnt}: {data}")
-                            elif msg.type in (WSMsgType.CLOSED, WSMsgType.ERROR):
-                                print('Non-text message received - error or closed')
-                                break
-                        print('FOR loop exited!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-                    except Exception as e:
-                        print(f"Unexpected error in message loop: {e}, attempting to reconnect...")
-                        break  # Break out of the inner while loop to reconnect
+                try:
+                    await ws.send_json({
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "public/subscribe",
+                        "params": {
+                            "channels": get_channels()
+                        }
+                    })
+                    print('sent subscribe requet.....')
+                    async for msg in ws:
+                        if msg.type == WSMsgType.TEXT:
+                            data = msg.data.strip()
+                            await produce_to_kafka(producer, KAFKA_TOPIC, data)
+                            cnt += 1
+                            if cnt % 200 == 0:
+                                print(f"{cnt}: {data}")
+                        elif msg.type in (WSMsgType.CLOSED, WSMsgType.ERROR):
+                            print('Non-text message received - error or closed')
+                            break
+                    print('FOR loop exited!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                except Exception as e:
+                    print(f"Unexpected error in message loop: {e}, attempting to reconnect...")
+                    break  # Break out of the inner while loop to reconnect
                 print('WHILE loop exited!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         except (WSServerHandshakeError, ClientConnectorError) as e:
             print(f"WebSocket connection error: {e}, retrying in {retry_delay} seconds...")

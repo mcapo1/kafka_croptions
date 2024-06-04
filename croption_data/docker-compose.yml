@@ -37,52 +37,58 @@ services:
         POSTGRES_PASSWORD: Python123  # Replace 'rootpassword' with your desired password
       volumes:
         - ./data/timescale/db-data:/var/lib/postgresql/data
+#
+#  mongo:
+#    container_name: mongo
+#    restart: always
+#    image: mongo:4.4
+#    environment:
+#      MONGO_INITDB_ROOT_USERNAME: team
+#      MONGO_INITDB_ROOT_PASSWORD: Python123
+#    env_file:
+#      - .env # configure mongo
+#    volumes:
+#      - ./data/mongo/db-data:/data/db # persist data even if container shuts down
+#    ports:
+#      - 27018:27017
+#
+#  spark-master:
+#    image: bitnami/spark:latest
+#    ports:
+#      - "8080:8080"
+#      - "7077:7077"
+#    volumes:
+#      - ./data/spark/db-data:/opt/spark
+#    environment:
+#      - SPARK_MODE=master
+#
+#  spark-worker:
+#    image: bitnami/spark:latest
+#    ports:
+#      - "8081:8081" # Optionally expose different ports for each worker if needed
+#      - "7078:7078"
+#    volumes:
+#      - ./data/spark/db-data:/opt/spark
+#    environment:
+#      - SPARK_MODE=worker
+#      - SPARK_MASTER_URL=spark://spark-master:7077
+#    depends_on:
+#      - spark-master
 
-  mongo:
-    container_name: mongo
-    restart: always
-    image: mongo:4.4
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: team
-      MONGO_INITDB_ROOT_PASSWORD: Python123
-    env_file:
-      - .env # configure mongo
-    volumes:
-      - ./data/mongo/db-data:/data/db # persist data even if container shuts down
-    ports:
-      - 27018:27017
-
-  spark-master:
-    image: bitnami/spark:latest
-    ports:
-      - "8080:8080"
-      - "7077:7077"
-    volumes:
-      - ./data/spark/db-data:/opt/spark
-    environment:
-      - SPARK_MODE=master
-
-  spark-worker:
-    image: bitnami/spark:latest
-    ports:
-      - "8081:8081" # Optionally expose different ports for each worker if needed
-      - "7078:7078"
-    volumes:
-      - ./data/spark/db-data:/opt/spark
-    environment:
-      - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master:7077
-    depends_on:
-      - spark-master
-
-  ubuntu:
+  ub_prod:
     image: ubuntu:22.04
     volumes:
       - ./scripts:/workspace
     working_dir: /workspace
     command: /workspace/startup.sh
-    depends_on:
-      - spark-master
+
+
+  ub_cons:
+    image: ubuntu:22.04
+    volumes:
+      - ./scripts:/workspace
+    working_dir: /workspace
+    command: /workspace/startup.sh
 
   jupyterlab:
     image: jupyter/pyspark-notebook
@@ -97,8 +103,7 @@ services:
 #      - JUPYTER_TOKEN=''
 #      - JUPYTER_PASSWORD=''
     command: start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''
-    depends_on:
-      - spark-master
+
 volumes:
   kafka-volume:
   zookeeper-volume:

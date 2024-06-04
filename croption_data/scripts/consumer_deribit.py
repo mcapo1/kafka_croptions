@@ -294,7 +294,7 @@ async def consume_messages(consumer, db):
 
                     cnt = cnt + 1
                     if cnt % 100 == 0:
-                        logger.info(f'{ticker_name}: {cnt}, --- {tick_data}')
+                        logger.info(f'{cnt}: {tick_data}')
                 except json.JSONDecodeError:
                     logger.error("Error decoding JSON")
         except KafkaError as e:

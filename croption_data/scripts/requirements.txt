@@ -8,3 +8,4 @@ aiohttp
 kafka-python
 apscheduler
 requests
+aiohttp
