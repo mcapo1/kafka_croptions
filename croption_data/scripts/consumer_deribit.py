@@ -343,7 +343,7 @@ async def main():
     consumer = AIOKafkaConsumer(
         KAFKA_TOPIC,
         bootstrap_servers=KAFKA_SERVERS,
-        # group_id="your-group-id",
+        group_id="consumer-group-id",
         auto_offset_reset='latest',
         enable_auto_commit=False,  # Disable auto commit
         session_timeout_ms=30000,  # 30 seconds
